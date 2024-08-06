@@ -1,0 +1,125 @@
+Boot >> Kernal >> User Space
+
+> Install Docker if it's not there 
+	>install docker_desktop from docker website
+
+> Run -> docker run --privileged -it ubuntu
+      	 --privileged > Gives the permission to mount inside the docker
+	 -it > this means docker will be interactive
+
+>* If you face "docker is not recognized as an internal or external command" just set the enviroment variable "C:\Program Files\Docker\Docker\resources\bin"
+
+> apt update - Update should always be done :)
+
+>> Some Dependencies Installation
+
+> apt install bzip2 git vim make gcc libncurses-dev flex bison bc cpio libelf-dev libssl-dev syslinux dosfstools 
+
+> These are dependencies which are needed let me just tell a brief of these commands 
+
+	> bzip2 -  A compression utility that is used to compress files. It is often used for creating .bz2 archive files (We are gonna use it for the BusyBox)
+	> git - Version control system 
+	> vim - Just a god level text editor :)
+	> make - A build automation tool that automatically builds executable programs and libraries from source code
+	> gcc - The GNU compiler collection (C, C++ Users assemble)
+	> libncurses-dev - Development files for the ncurses library, which provides functions to write text-based user interfaces in a terminal-independent manner
+	> flex - A tool for generating scanners
+	> bison - A parser generator that is part of the GNU Project. It converts grammar descriptions for LALR (Look-Ahead LR) context-free grammars into a C program to parse that grammar
+	> bc - An arbitrary-precision calculator language that supports interactive execution of statements. (Simply used for mathematical calculations)
+	> cpio -  A utility to create and extract archive files, often used for backup and restoration 
+	> libelf-dev - Development files for the ELF (Executable and Linkable Format) library, which provides routines to access ELF object files and libraries
+	> libssl-dev - Development files for the OpenSSL library, which implements the Secure Sockets Layer (SSL) and Transport Layer Security (TLS) protocols for secure communication over networks
+	> syslinux - A suite of lightweight bootloaders for starting up Linux operating systems
+	> dosfstools - A collection of utilities to create and maintain FAT filesystems, commonly used on removable storage media like USB drives and memory cards
+
+>> Let's clone the Linux Repo 
+	> git clone --depth 1 https://github.com/torvalds/linux.git
+	> --depth 1 - Means I'm not gonna clone the entire repo just the last commit
+
+>> cd linux/ (get into the linux directory)
+
+>> make menuconfig (These will open a nice interactive menu for all kinds of build options)
+	> make sure that 64-bit kernel is marked 
+	> if not make sure to mark it using "Space" then exit after saving
+>> make -j 8 (These gonna split the make into 8 jobs)
+	> Use according to your number of cores 
+>> You'll get a message that the "bzImage" is ready. It's the actual binary of Kernal compressed. Gonna use it later
+
+>> mkdir /boot-files
+
+>> cp bzImage_path /boot-files
+
+>> Now let's build BusyBox 
+
+>> git clone --depth 1 https://git.busybox.net/busybox
+
+>> cd busybox/
+
+>> make menuconfig 
+	> In menuconfig go to Settings > Search for "Build Static Binary" Save and Exit
+	> Selecting Build static binary to make it as simple as possible
+
+>> make -j 8
+
+>> mkdir /boot-files/initrmfs
+
+>> make CONFIG_PREFIX = /boot-files/initramfs install 
+	> initramfs is the initial file system the kernel loads after booting and we'll put the busybox there
+	*> You might face an error starting with "networking/tc.c: In function ‘cbq_print_opt’:" So, to solve it just change the CONFIG_TC=y to CONFIG_TC=n of ".config" file of "/busybox"
+
+>> cd /boot-files/initramfs
+
+>> vim init 
+	write "#!/bin/sh
+		/bin/sh"
+
+>> rm linuxrc
+
+>> chmod +x init
+
+>> find . | cpio -o -H newc > ../init.cpio
+	> -o - Type of archive
+
+>> cd .. (To check if the init.cpio is created or not)
+
+>> now the bootloader is left :>
+
+>> apt install syslinux
+
+>> dd if=/dev/zero of=boot bs=1M count=50 
+	> Now what this command is gonna do is that create a file of 50 bytes and fill it with Zeros
+
+>> Using ls you can see that the boot file is created 	
+
+>> apt install dosfstools
+
+>> mkfs -t fat boot 
+	> This create a fat filesystem on a boot file
+
+>> ls 
+
+>>  syslinux boot
+
+>> Now our boot file is ready
+
+>> mkdir Saswat (Upto you to choose the name)
+
+>> mount boot Saswat
+
+>> cp bzImage init.cpio Saswat
+
+>> umount Saswat
+
+It's almost there we are there to end the journey of our first Linux Distro making....
+
+Now we just need to copy the boot image from docker to host
+
+>> docker cp container_id:/boot-files/boot . (Dot is also part of the command as I Want to copy it to my current directory)
+
+>> qemu-system-x86_64 boot
+
+>> Another command prompt might have opened up.
+	> Just type /bzImage -initrd=/init.cpio
+
+There we gooooo!!! Our distro is readyyyyy!!!
+Just don't use exit or it'll gonna panic on you.
